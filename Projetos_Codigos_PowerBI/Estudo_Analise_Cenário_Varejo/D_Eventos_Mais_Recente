@@ -1,0 +1,23 @@
+SELECT
+    ficha.pasta AS 'PASTA',
+    eventos.nkEvento AS 'NKEVENTO',
+    eventos.dataEventoCliente AS 'DATA_EVENTO_MAIS_RECENTE'
+FROM
+    juridico.fichaProcessual as ficha with (nolock)
+    LEFT join negocial.COB_Contrato as con with (nolock) on ficha.pasta = con.nkPasta
+    LEFT JOIN negocial.COB_Cliente AS cli WITH (NOLOCK) ON CON.nkCliente = cli.nkCliente
+LEFT JOIN (
+    SELECT
+        evc.nkEvento,
+        cli.cpfcnpjcliente,
+        contr.nkPasta,
+        evc.dataEventoCliente,
+        ROW_NUMBER() OVER (PARTITION BY cli.cpfcnpjcliente ORDER BY evc.dataEventoCliente DESC,evc.nkEvento DESC ) AS rk      
+    FROM
+        negocial.COB_clienteEvento AS evc WITH (NOLOCK)
+        LEFT JOIN negocial.COB_Evento AS eve WITH (NOLOCK) ON evc.nkEvento = eve.nkEvento
+        LEFT JOIN negocial.COB_Cliente AS cli WITH (NOLOCK) ON evc.nkCliente = cli.nkCliente
+        LEFT JOIN negocial.COB_Contrato AS contr WITH (NOLOCK) ON cli.nkCliente = contr.nkCliente
+) AS eventos ON eventos.nkpasta = con.nkpasta AND eventos.rk = 1
+	WHERE  
+		ficha.Produto = 'ITAÚ - COBRANÇA VAREJO'

@@ -1,0 +1,183 @@
+-- CTE que filtra a FichaProcessual pelo produto desejado
+WITH FichaFiltrada AS (
+    SELECT *
+    FROM Juridico.FichaProcessual WITH (NOLOCK)
+    WHERE PRODUTO = 'BRADESCO - COBRANÇA'
+)
+SELECT 
+    ff.PASTA,
+    ff.PRODUTO,
+    ff.TIPO_ACAO,
+    ff.ESTADO,
+    ff.CARTEIRA,
+    ff.PROCESSO,
+    LEN(ff.PROCESSO) AS [QUANTIDADE DE CARACTERES],
+    ff.BJ,
+    ff.STATUS_PASTA,
+    ff.DATA_DO_AJUIZAMENTO,
+    ff.DATA_ENCERRAMENTO,
+    ff.DATA_ENTRADA_PROC,
+    ff.DATA_TERCEIRIZACAO,
+    ff.DATA_CADASTRO_PASTA,
+    ff.RESPONSAVEL_1,
+    ff.CASO_NOVO,
+    ff.CASO_ANTIGO,
+    ff.AGRUPADORES,
+    ff.AREA,
+    ff.VALOR_CAUSA,
+    ff.ASSUNTO,
+    enc.TIPO_ANDAMENTO AS 'AJUIZAMENTO_PENDENTE_ENCERRAMENTO',
+    enc.DATA_ANDAMENTO AS 'DATA_AJUIZAMENTO_PENDENTE_ENCERRAMENTO',
+    dir.TIPO_ANDAMENTO AS 'AJUIZAMENTO_PENDENTE_DOCUMENTAÇÃO',
+    dir.DATA_ANDAMENTO AS 'DATA_AJUIZAMENTO_PENDENTE_DOCUMENTAÇÃO',
+    acp.TIPO_ANDAMENTO AS 'AJUIZAMENTO_PENDENTE_ACAO_NAO_AJUIZADA',
+    acp.DATA_ANDAMENTO AS 'DATA_AJUIZAMENTO_PENDENTE_ACAO_NAO_AJUIZADA',
+    acorven.statusAcordo,
+    c1.TIPO_COMPROMISSO AS TIPO_COMPROMISSO_1,
+    c2.TIPO_COMPROMISSO AS TIPO_COMPROMISSO_2,
+    c3.TIPO_COMPROMISSO AS TIPO_COMPROMISSO_3,
+    c4.TIPO_COMPROMISSO AS TIPO_COMPROMISSO_4,
+    c4.DATA_CONCLUSAO_COMPROMISSO AS DATA_CONCLUSAO_COMPROMISSO_4,
+    c5.TIPO_COMPROMISSO AS TIPO_COMPROMISSO_5,
+    c5.DATA_CONCLUSAO_COMPROMISSO AS DATA_CONCLUSAO_COMPROMISSO_5,
+    tp.TIPO_DE_DOCUMENTO,
+    tp.DATA_EXECUCAO_TAREFA,
+    CASE 
+        WHEN FF.DATA_DO_AJUIZAMENTO IS NOT NULL
+        THEN 'Ajuizamento Concluido'
+        WHEN FF.DATA_DO_AJUIZAMENTO IS NULL
+        AND  LEN(FF.PROCESSO) >8
+        THEN 'Ajuizamento Concluido'
+        ELSE 'Ajuizamento Pendente'
+    END AS StatusAjuizamento
+FROM FichaFiltrada ff
+LEFT JOIN (
+    SELECT 
+        PASTA,
+        TIPO_COMPROMISSO,
+        DATA_CONCLUSAO_COMPROMISSO,
+        ROW_NUMBER() OVER (PARTITION BY PASTA ORDER BY DATA_CONCLUSAO_COMPROMISSO DESC) AS RankCompromisso
+    FROM Juridico.Compromissos_Concluidos WITH (NOLOCK)
+    WHERE TIPO_COMPROMISSO = 'Encerramento'
+) c1 ON ff.PASTA = c1.PASTA AND c1.RankCompromisso = 1
+LEFT JOIN (
+    SELECT 
+        PASTA,
+        TIPO_COMPROMISSO,
+        DATA_CONCLUSAO_COMPROMISSO,
+        ROW_NUMBER() OVER (PARTITION BY PASTA ORDER BY DATA_CONCLUSAO_COMPROMISSO DESC) AS RankCompromisso
+    FROM Juridico.Compromissos_Concluidos WITH (NOLOCK)
+    WHERE TIPO_COMPROMISSO = 'PESQUISA COMPLETA DE BENS - TESE DIFERENCIADA'
+) c2 ON ff.PASTA = c2.PASTA AND c2.RankCompromisso = 1
+LEFT JOIN (
+    SELECT 
+        PASTA,
+        TIPO_COMPROMISSO,
+        DATA_CONCLUSAO_COMPROMISSO,
+        ROW_NUMBER() OVER (PARTITION BY PASTA ORDER BY DATA_CONCLUSAO_COMPROMISSO DESC) AS RankCompromisso
+    FROM Juridico.Compromissos_Concluidos WITH (NOLOCK)
+    WHERE TIPO_COMPROMISSO = 'RECOLHER CUSTAS INICIAIS DA AÇÃO'
+) c3 ON ff.PASTA = c3.PASTA AND c3.RankCompromisso = 1
+LEFT JOIN (
+    SELECT 
+        PASTA,
+        TIPO_COMPROMISSO,
+        DATA_CONCLUSAO_COMPROMISSO,
+        ROW_NUMBER() OVER (PARTITION BY PASTA ORDER BY DATA_CONCLUSAO_COMPROMISSO DESC) AS RankCompromisso
+    FROM Juridico.Compromissos_Concluidos WITH (NOLOCK)
+    WHERE TIPO_COMPROMISSO = 'RECURSO DE APELAÇÃO'
+) c4 ON ff.PASTA = c4.PASTA AND c4.RankCompromisso = 1
+LEFT JOIN (
+    SELECT 
+        PASTA,
+        TIPO_COMPROMISSO,
+        DATA_CONCLUSAO_COMPROMISSO,
+        ROW_NUMBER() OVER (PARTITION BY PASTA ORDER BY DATA_CONCLUSAO_COMPROMISSO DESC) AS RankCompromisso
+    FROM Juridico.Compromissos_Concluidos WITH (NOLOCK)
+    WHERE TIPO_COMPROMISSO = 'CONTRARRAZÕES DE APELAÇÃO'
+) c5 ON ff.PASTA = c5.PASTA AND c5.RankCompromisso = 1
+LEFT JOIN (
+    SELECT 
+        PASTA,
+        TIPO_DE_DOCUMENTO,
+        DATA_EXECUCAO_TAREFA,
+        ROW_NUMBER() OVER (PARTITION BY PASTA ORDER BY DATA_EXECUCAO_TAREFA DESC) AS RankTarefa
+    FROM Juridico.Triare_Protocolo WITH (NOLOCK)
+    WHERE TIPO_DE_DOCUMENTO = 'Petição de Suspensão pelo 921, III, CPC (H)'
+) tp ON ff.PASTA = tp.PASTA AND tp.RankTarefa = 1
+LEFT JOIN Juridico.Penhora_Imoveis pimo WITH (NOLOCK)
+    ON ff.PASTA = pimo.PASTA
+LEFT JOIN (    
+    SELECT
+        cli.cpfcnpjcliente,
+        contr.nkPasta,
+        acord.statusAcordo 
+    FROM negocial.COB_clienteEvento AS evc WITH (NOLOCK)
+    INNER JOIN negocial.COB_Acordo AS acord WITH (NOLOCK)
+         ON evc.nkClienteEvento = acord.nkAcordo 
+    INNER JOIN negocial.COB_Cliente AS cli WITH (NOLOCK)
+         ON evc.nkCliente = cli.nkCliente
+    INNER JOIN negocial.COB_Contrato AS contr WITH (NOLOCK)
+         ON cli.nkCliente = contr.nkCliente
+) acorven ON ff.PASTA = acorven.nkPasta 
+
+           -- -- aguardando encerramento
+           -- 'ENCERRAMENTO SOLICITADO',
+           -- 'IMP 098 - ENCERRAMENTO - SOLICITAÇÃO',
+           -- 'IMP 099 -ENCERRAMENTO - CONFIRMAÇÃO CLIENTE',
+           -- -- Ação não Ajuizada
+           -- 'AÇÃO NÃO AJUIZADA - ABAIXO DA RÉGUA',
+           -- 'AÇÃO NÃO AJUIZADA – ACORDO ATIVO',
+           -- -- Pendência Documentação Banco
+           -- 'DOCUMENTAÇÃO INCOMPLETA – AGUARDANDO REGULARIZAÇÃO')
+
+LEFT JOIN (
+    SELECT 
+        PASTA,
+        TIPO_ANDAMENTO,
+        DATA_ANDAMENTO,
+        HORA_ANDAMENTO,
+        ROW_NUMBER() OVER (
+            PARTITION BY PASTA 
+            ORDER BY DATA_ANDAMENTO DESC, HORA_ANDAMENTO DESC
+        ) AS RANKANDAMENTO
+    FROM Juridico.Andamentos WITH (NOLOCK)
+    WHERE TIPO_ANDAMENTO IN (
+        'ENCERRAMENTO SOLICITADO',
+        'IMP 098 - ENCERRAMENTO - SOLICITAÇÃO',
+        'IMP 099 -ENCERRAMENTO - CONFIRMAÇÃO CLIENTE'
+    )
+) enc ON ff.PASTA = enc.PASTA AND enc.RANKANDAMENTO = 1
+
+LEFT JOIN (
+    SELECT 
+        PASTA,
+        TIPO_ANDAMENTO,
+        DATA_ANDAMENTO,
+        HORA_ANDAMENTO,
+        ROW_NUMBER() OVER (
+            PARTITION BY PASTA 
+            ORDER BY DATA_ANDAMENTO DESC, HORA_ANDAMENTO DESC
+        ) AS RANKANDAMENTO
+    FROM Juridico.Andamentos WITH (NOLOCK)
+    WHERE TIPO_ANDAMENTO IN (
+        'AÇÃO NÃO AJUIZADA - ABAIXO DA RÉGUA',
+        'AÇÃO NÃO AJUIZADA – ACORDO ATIVO'
+    )
+) ACP ON ff.PASTA = ACP.PASTA AND ACP.RANKANDAMENTO = 1
+
+LEFT JOIN (
+    SELECT 
+        PASTA,
+        TIPO_ANDAMENTO,
+        DATA_ANDAMENTO,
+        HORA_ANDAMENTO,
+        ROW_NUMBER() OVER (
+            PARTITION BY PASTA 
+            ORDER BY DATA_ANDAMENTO DESC, HORA_ANDAMENTO DESC
+        ) AS RANKANDAMENTO
+    FROM Juridico.Andamentos WITH (NOLOCK)
+    WHERE TIPO_ANDAMENTO IN (
+        'DOCUMENTAÇÃO INCOMPLETA – AGUARDANDO REGULARIZAÇÃO'
+    )
+) DIR ON ff.PASTA = DIR.PASTA AND DIR.RANKANDAMENTO = 1

@@ -1,0 +1,57 @@
+WITH ContratosLocalizados AS (
+    SELECT 
+        con2.nkContrato,
+        con2.numeroContrato
+    FROM
+        negocial.COB_Contrato AS con2 WITH (NOLOCK)
+        LEFT JOIN negocial.COB_Negociacao AS neg WITH (NOLOCK) ON con2.nkContrato = neg.nkContrato
+        LEFT JOIN negocial.COB_eventoNegociacao AS evcNeg WITH (NOLOCK) ON neg.nkNegociacao = evcNeg.nkNegociacao
+        LEFT JOIN negocial.COB_clienteEvento AS evc WITH (NOLOCK) ON evcNeg.nkClienteEvento = evc.nkClienteEvento
+        LEFT JOIN negocial.COB_Evento AS eve WITH (NOLOCK) ON evc.nkEvento = eve.nkEvento
+    WHERE
+        eve.Evento IN (
+            'Visita frutífera', 'Retorno de Ação Email Frutífera', 'Proposta Expurgada - Parou de atender',
+            'Proposta Expurgada - Desistiu do acordo', 'Proposta em Análise cadastrada pela rede',
+            'Promessa Pgto - Parcelado', 'Promessa Pgto - À Vista', 'Possibilidade de Negócio',
+            'Pagamento - Aguardando Minuta', 'Oferta de Acordo', 'N.A - Proposta Negada pelo Banco',
+            'N.A - Proposta em Análise pelo Cliente', 'N.A - Proposta em Análise pelo Banco',
+            'N.A - Proposta em Análise Cliente MEDIA', 'N.A - Proposta em Análise Cliente BAIXA',
+            'N.A - Proposta em Análise Cliente ALTA', 'N.A - Negociação Avançada', 'N.A - Discorda da Proposta',
+            'N.A - Cliente Ofertou Contra Proposta', 'N.A - Banco Ofertou Contra Proposta',
+            'N.A - Aguardando Resposta do Banco', 'N.A - Aguardando Proposta do Banco',
+            'N.A - Aguardando Parecer da Rede', 'N.A - Aguardando Parâmetros do Cliente',
+            'N.A - Aguardando Parâmetros do Banco', 'N.A - Aguardando Pagamento do Cliente',
+            'N.A - Aguardando Orientação do Jurídico', 'N.A - Aguardando Orientação do Banco',
+            'N.A - Aguardando Minuta do Banco', 'N.A - Aguardando Documentação do Cliente',
+            'N.A - Aguardando Documentação do Banco', 'Início de Tratativas', 'Gerente negociação',
+            'Fidelizados Expirados', 'Em Negociação - Telefone', 'Em Negociação - Rede Comercial',
+            'Em Negociação - Multicanalidade', 'Contato gerente', 'Cessão de Credito em Análise',
+            'BB-Rastreamento Minuta', 'BB-Proposta de Acordo', 'BB-Possibilidade de Negócio',
+            'BB-Pós - Parcela em Dia', 'BB-N.A - Aguardando Parâmetros do Cliente',
+            'BB-N.A - Aguardando Orientação do Jurídico', 'BB-N.A - Aguardando Orientação do Banco',
+            'BB-N.A - Proposta em Análise pelo Cliente', 'BB-N.A - Tratamento Diferenciado',
+            'BB-N.A - Proposta em Análise pelo Banco', 'BB-N.A - Negociação Avançada',
+            'BB-N.A - Exaustão Patrimonial', 'BB-N.A - Aguardando Resposta do Banco',
+            'BB-N.A - Aguardando Parâmetros do Banco', 'BB-N.A - Aguardando Pagamento do Cliente',
+            'BB-N.A - Aguardando Documentação Cliente', 'BB-N.A - Aguardando Documentação Banco',
+            'BB-Cliente confirma dados - queda ligação', 'BB-Cancelamento de Proposta de Acordo'
+        )
+        AND DATEDIFF(DAY, evc.dataEventoCliente, GETDATE()) <= 90
+)
+SELECT
+    ficha.pasta,
+    cli.cpfcnpjcliente as 'CNPJ_PARTE_ADVERSA',
+    con.numeroContrato,
+    CASE
+        WHEN cl.nkContrato IS NOT NULL THEN 'Localizado'
+        ELSE 'Não Localizado'
+    END AS Localizado
+FROM
+    juridico.fichaProcessual AS ficha WITH (NOLOCK)
+    LEFT JOIN negocial.COB_Evento AS eve WITH (NOLOCK) ON evc.nkEvento = eve.nkEvento
+    LEFT JOIN negocial.COB_Cliente AS cli WITH (NOLOCK) ON evc.nkCliente = cli.nkCliente
+    LEFT JOIN negocial.COB_Contrato AS con WITH (NOLOCK) ON ficha.pasta = con.nkPasta
+    LEFT JOIN ContratosLocalizados AS cl ON con.nkContrato = cl.nkContrato
+        AND con.numeroContrato = cl.numeroContrato
+WHERE
+    ficha.Produto = 'BRADESCO - COBRANÇA';

@@ -1,0 +1,53 @@
+WITH EventosMaisRecentes AS (
+    SELECT
+        evc.CNPJ_PARTE_ADVERSA,
+        evc.NKEVENTO,
+        evc.dataEventoCliente,
+        ROW_NUMBER() OVER (PARTITION BY evc.CNPJ_PARTE_ADVERSA ORDER BY evc.dataEventoCliente DESC, evc.nkEvento DESC) AS rn
+    FROM
+        negocial.COB_clienteEvento evc WITH (NOLOCK)
+        LEFT JOIN negocial.COB_Evento eve WITH (NOLOCK) ON evc.nkEvento = eve.nkEvento
+        LEFT JOIN NEGOCIAL.COB_CONTRATO cont WITH (NOLOCK) ON evc.nkCliente = cont.nkCliente
+        LEFT JOIN juridico.FICHAPROCESSUAL fp WITH (NOLOCK) ON cont.nkPasta = fp.pasta
+    WHERE
+        fp.PRODUTO = 'ITAÚ - COBRANÇA VAREJO'
+)
+SELECT
+    fp.PASTA,
+    fp.CNPJ_PARTE_ADVERSA,
+    fp.PRODUTO,
+    fp.TIPO_ACAO,
+    fp.ESTADO,
+    fp.CARTEIRA,
+    fp.PROCESSO,
+    fp.BJ,
+    fp.STATUS_PASTA,
+    fp.DATA_DO_AJUIZAMENTO,
+    fp.DATA_ENCERRAMENTO,
+    fp.DATA_ENTRADA_PROC,
+    fp.DATA_TERCEIRIZACAO,
+    fp.DATA_CADASTRO_PASTA,
+    fp.RESPONSAVEL_1,
+    fp.CASO_NOVO,
+    fp.CASO_ANTIGO,
+    fp.AGRUPADORES,
+    fp.ASSUNTO,
+    OPER.OPERADOR,
+    OPER.NKLOGIN,
+    EVC.NKEVENTO,
+    EVC.dataEventoCliente,
+    EVC.NKCLIENTEEVENTO,
+    EVE.EVENTO,
+    EventosMaisRecentes.dataEventoCliente AS DataEventoMaisRecente,
+    EventosMaisRecentes.NKEVENTO AS NkEventoMaisRecente
+FROM
+    JURIDICO.FICHAPROCESSUAL FP
+    LEFT JOIN NEGOCIAL.COB_CONTRATO CONT WITH (NOLOCK) ON FP.PASTA = CONT.NKPASTA
+    LEFT JOIN negocial.COB_Negociacao neg WITH (NOLOCK) ON CONT.nkContrato = neg.nkContrato
+    LEFT JOIN negocial.COB_eventoNegociacao evcNeg WITH (NOLOCK) ON neg.nkNegociacao = evcNeg.nkNegociacao
+    LEFT JOIN negocial.COB_clienteEvento evc WITH (NOLOCK) ON evcNeg.nkClienteEvento = evc.nkClienteEvento
+    LEFT JOIN negocial.COB_Operador oper WITH (NOLOCK) ON EVC.NKOPERADOR = OPER.NKOPERADOR
+    LEFT JOIN negocial.COB_Evento eve WITH (NOLOCK) ON evc.nkEvento = eve.nkEvento
+    LEFT JOIN EventosMaisRecentes ON evc.CNPJ_PARTE_ADVERSA = EventosMaisRecentes.CNPJ_PARTE_ADVERSA AND evc.nkEvento = EventosMaisRecentes.NKEVENTO
+WHERE
+    FP.PRODUTO = 'ITAÚ - COBRANÇA VAREJO'

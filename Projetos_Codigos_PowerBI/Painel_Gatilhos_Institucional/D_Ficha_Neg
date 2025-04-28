@@ -1,0 +1,511 @@
+WITH FichaProcessualFiltrada AS (
+    -- Filtra as fichas processuais com base nos produtos e status
+    SELECT 
+        FP.PASTA,
+        FP.CARTEIRA,
+        FP.PRODUTO,
+        FP.ESTADO,
+        FP.COMARCA,
+        FP.TIPO_ACAO,
+        FP.STATUS_PASTA,
+        FP.DATA_CADASTRO_PASTA,
+        FP.DATA_DO_AJUIZAMENTO,
+        FP.DATA_ENTRADA_PROC,
+        FP.ASSUNTO,
+        FP.DATA_TERCEIRIZACAO,
+        FP.CASO_NOVO,
+        FP.CASO_ANTIGO,
+        FP.PROCESSO,
+        FP.VALOR_CAUSA,
+        FP.BJ,
+        FP.DATA_ENCERRAMENTO,
+        FP.RESPONSAVEL_1,
+        FP.AGRUPADORES,
+        FP.FORCA_TAREFA,
+        FP.ESFERA,
+        FP.ORGAO_BANCO,
+        FP.FRENTE_RECUPERA_BB
+    FROM 
+        JURIDICO.FichaProcessual AS FP WITH (NOLOCK)
+    WHERE 
+        FP.PRODUTO IN (
+            'ITAÚ - COBRANÇA VAREJO',
+            'ITAÚ - COBRANÇA ATACADO',	
+            'SANTANDER - AÇÕES ESPECIAIS',
+            'SANTANDER - ESPECIALIZADO AGRONEGOCIO',
+            'SANTANDER - VAREJO',
+            'SAFRA - ATACADO PJ',
+            'SAFRA - VAREJO PJ',
+            'SANTANDER - CORPORATE',
+            'CREDICITRUS - COBRANÇA',
+            'COOPERCITRUS - COBRANÇA',
+            'SICOOB CREDIGUAÇU - COBRANÇA',
+            'SICOOBPRO - COBRANÇA',
+            'UNICENTROBR - COBRANÇA',
+            'BRADESCO - COBRANÇA',
+            'BANCO DO BRASIL - COBRANÇA - SEGMENTO 1',
+            'BANCO DO BRASIL - COBRANÇA - SEGMENTO 2',
+            'BANCO DO BRASIL - COBRANÇA - SEGMENTO 3',
+            'BB - COBRANÇA',
+            'BANCO DO BRASIL - COBRANÇA - ATIPICAS',
+            'AILOS - COBRANÇA',
+            'ITAÚ - COBRANÇA VAREJO INSTRUMENTO',
+            'ITAÚ - COBRANÇA VAREJO INTERMEDIARIA'
+        )
+        AND FP.STATUS_PASTA = 'ATIVO'
+),
+AcordoRecente AS (
+    -- Obtém o acordo mais recente para cada pasta
+    SELECT 
+        contr.nkPasta,
+        acord.statusAcordo AS 'STATUS_ACORDO',
+        acord.nkstatusAcordo AS 'NK_STATUS_ACORDO',
+        acord.dataPrimeiroVencimento,
+        ROW_NUMBER() OVER (PARTITION BY contr.NKPASTA ORDER BY acord.dataPrimeiroVencimento DESC, acord.nkstatusAcordo DESC) AS rk,
+        CASE 
+            WHEN acord.nkstatusAcordo IN (1, 3) THEN 'MINUTA ENVIADA'
+            WHEN acord.nkstatusAcordo IN (5, 6) THEN 'ACORDO PAGO'
+            WHEN acord.nkstatusAcordo IN (2, 7, 9) THEN 'CANCELADO'
+            ELSE 'OUTROS' 
+        END AS 'STATUS_GERAL'
+    FROM 
+        negocial.COB_clienteEvento AS evc WITH (NOLOCK)
+        LEFT JOIN negocial.COB_Acordo AS acord WITH (NOLOCK) ON evc.nkClienteEvento = acord.nkAcordo
+        LEFT JOIN negocial.COB_Cliente AS cli WITH (NOLOCK) ON evc.nkCliente = cli.nkCliente
+        LEFT JOIN negocial.COB_Contrato AS contr WITH (NOLOCK) ON cli.nkCliente = contr.nkCliente
+        INNER JOIN FichaProcessualFiltrada AS FP ON contr.nkPasta = FP.PASTA -- Filtra apenas as pastas relevantes
+),
+UltimoCPC AS (
+    -- Obtém o último CPC (Contato Efetivo) para cada cliente
+    SELECT
+        eve.Evento AS 'ULTIMO_CPC',
+        evc.nkEvento,
+        cli.cpfcnpjcliente,
+        contr.nkPasta,
+        evc.dataEventoCliente AS 'DATA_ULTIMO_CPC',
+        ROW_NUMBER() OVER (PARTITION BY cli.cpfcnpjcliente ORDER BY evc.dataEventoCliente DESC, evc.nkEvento DESC) AS rk
+    FROM
+        negocial.COB_clienteEvento AS evc WITH (NOLOCK)
+        LEFT JOIN negocial.COB_Evento AS eve WITH (NOLOCK) ON evc.nkEvento = eve.nkEvento
+        LEFT JOIN negocial.COB_Cliente AS cli WITH (NOLOCK) ON evc.nkCliente = cli.nkCliente
+        LEFT JOIN negocial.COB_Contrato AS contr WITH (NOLOCK) ON cli.nkCliente = contr.nkCliente
+        INNER JOIN FichaProcessualFiltrada AS FP ON contr.nkPasta = FP.PASTA -- Filtra apenas as pastas relevantes
+    WHERE 
+        evc.nkEvento IN (            -- Lista de IDs de eventos considerados
+        2,
+        3,
+        10,
+        11,
+        12,
+        15,
+        16,
+        17,
+        29,
+        38,
+        39,
+        68,
+        69,
+        86,
+        122,
+        141,
+        4339,
+        8723,
+        8724,
+        8725,
+        8726,
+        8731,
+        8732,
+        9017,
+        9018,
+        9019,
+        9020,
+        9021,
+        9022,
+        9023,
+        9028,
+        9033,
+        9132,
+        9133,
+        9134,
+        9135,
+        9137,
+        9140,
+        9142,
+        9159,
+        9160,
+        9168,
+        9169,
+        9170,
+        9171,
+        9172,
+        9173,
+        9174,
+        9175,
+        9335,
+        9361,
+        9817,
+        10456,
+        11255,
+        13205,
+        13206,
+        13213,
+        13214,
+        13233,
+        13753,
+        13754,
+        13773,
+        13832,
+        13994,
+        14782,
+        15187,
+        15277,
+        15294,
+        15956,
+        15962,
+        15964,
+        15967,
+        15969,
+        15970,
+        15972,
+        15973,
+        15974,
+        15975,
+        15976,
+        15977,
+        15978,
+        15979,
+        15980,
+        15981,
+        15983,
+        15985,
+        15986,
+        15987,
+        15988,
+        15990,
+        15992,
+        15993,
+        15995,
+        15996,
+        15998,
+        16004,
+        16005,
+        16006,
+        16007,
+        16008,
+        16011,
+        16013,
+        16038,
+        16041,
+        16042,
+        16043,
+        16044,
+        16045,
+        16046,
+        16047,
+        16048,
+        16049,
+        16050,
+        16051,
+        16052,
+        16054,
+        16055,
+        16057,
+        16059,
+        16062,
+        16063,
+        16064,
+        16065,
+        16066,
+        16067,
+        16094,
+        16095,
+        16096,
+        16099,
+        16100,
+        16102,
+        16104,
+        16105,
+        16106,
+        16116,
+        16144
+        )
+),
+
+-- 2) Consolidar todas as penhoras em uma única varredura
+CTE_PENHORAS AS (
+    SELECT
+        PASTA,
+        SUM(CASE WHEN Fonte = 'IMOVEIS' THEN Valor ELSE 0 END) AS Valor_Imoveis,
+        SUM(CASE WHEN Fonte = 'MLE'     THEN Valor ELSE 0 END) AS Valor_MLE,
+        SUM(CASE WHEN Fonte = 'MLJ'     THEN Valor ELSE 0 END) AS Valor_MLJ
+    FROM (
+        SELECT PASTA, Valor_de_Arrematacao_Penhora_Imoveis AS Valor, 'IMOVEIS' AS Fonte
+        FROM JURIDICO.PENHORA_IMOVEIS WITH(NOLOCK)
+        UNION ALL
+        SELECT PASTA, Valor_Nominal_do_Deposito_Penhora_MLE, 'MLE'
+        FROM JURIDICO.PENHORA_MLE WITH(NOLOCK)
+        UNION ALL
+        SELECT PASTA, Valor_Levantado_Penhora_MLJ, 'MLJ'
+        FROM JURIDICO.PENHORA_MLJ WITH(NOLOCK)
+    ) x
+    GROUP BY PASTA
+),
+
+-- 3) Varre ANDAMENTOS uma única vez, criando flags para cada condição
+CTE_ANDAMENTOS AS (
+    SELECT
+        a.PASTA,
+        MAX(CASE WHEN a.TIPO_ANDAMENTO = 'COM SINAL VITAL' THEN 1 ELSE 0 END)                             AS Has_Com_Sinal_Vital,
+        MAX(CASE WHEN a.TIPO_ANDAMENTO = 'SEM SINAL VITAL' THEN 1 ELSE 0 END)                             AS Has_Sem_Sinal_Vital,
+        MAX(CASE WHEN a.TIPO_ANDAMENTO = 'IMP 070 - TESE PENHORA FATURAMENTO - PETICIONADO' THEN 1 ELSE 0 END) 
+                                                                                                         AS Has_Tese_Penhora_Peticionada,
+        MAX(CASE WHEN a.TIPO_ANDAMENTO = 'IMP 071.1 - TESE PENHORA FATURAMENTO - INDEFERIDO' THEN 1 ELSE 0 END)
+                                                                                                         AS Has_Tese_Penhora_Indeferida,
+        MAX(CASE WHEN a.TIPO_ANDAMENTO = 'IMP 076 - TESE DESVIO DE RECEBÍVEIS - PETICIONADO' THEN 1 ELSE 0 END)
+                                                                                                         AS Has_Tese_Desvio_Peticionada,
+        MAX(CASE WHEN a.TIPO_ANDAMENTO = 'IMP 077.1 - TESE DESVIO DE RECEBÍVEIS - INDEFERIDO' THEN 1 ELSE 0 END)
+                                                                                                         AS Has_Tese_Desvio_Indeferida,
+        MAX(CASE WHEN a.TIPO_ANDAMENTO = 'IMP 079 - TESE GRUPO ECONÔMICO - PETICIONADO' THEN 1 ELSE 0 END)
+                                                                                                         AS Has_Tese_Grupo_Peticionada,
+        MAX(CASE WHEN a.TIPO_ANDAMENTO = 'IMP 080.1 - TESE GRUPO ECONÔMICO - INDEFERIDO' THEN 1 ELSE 0 END)
+                                                                                                         AS Has_Tese_Grupo_Indeferida,
+        MAX(CASE WHEN a.TIPO_ANDAMENTO = 'IMP 081 - TESE SUCESSÃO EMPRESARIAL - PETICIONADO' THEN 1 ELSE 0 END)
+                                                                                                         AS Has_Tese_Sucessao_Peticionada,
+        MAX(CASE WHEN a.TIPO_ANDAMENTO = 'IMP 082.1 - TESE SUCESSÃO EMPRESARIAL - INDEFERIDO' THEN 1 ELSE 0 END)
+                                                                                                         AS Has_Tese_Sucessao_Indeferida,
+        MAX(CASE WHEN a.TIPO_ANDAMENTO = 'IMP 083 - TESE FRAUDE À EXECUÇÃO - PETICIONADO' THEN 1 ELSE 0 END)
+                                                                                                         AS Has_Tese_Fraude_Peticionada,
+        MAX(CASE WHEN a.TIPO_ANDAMENTO = 'IMP 084.1 - TESE FRAUDE À EXECUÇÃO - INDEFERIDO' THEN 1 ELSE 0 END)
+                                                                                                         AS Has_Tese_Fraude_Indeferida,
+        MAX(CASE WHEN a.TIPO_ANDAMENTO = 'IMP 085 - TESE DESCONSIDERAÇÃO INVERSA DA PERSONALIDADE JURÍDICA - PETICIONADO' THEN 1 ELSE 0 END)
+                                                                                                         AS Has_Tese_DescInversa_Peticionada,
+        MAX(CASE WHEN a.TIPO_ANDAMENTO = 'IMP 086.1 - TESE DESCONSIDERAÇÃO INVERSA DA PERSONALIDADE JURÍDICA - INDEFERIDO' THEN 1 ELSE 0 END)
+                                                                                                         AS Has_Tese_DescInversa_Indeferida,
+        MAX(CASE WHEN a.TIPO_ANDAMENTO = 'IMP 86.2 – TESE - INCIDENTE DESCONSIDERAÇÃO DA PERSONALIDADE JURÍDICA - PETICIONADO' THEN 1 ELSE 0 END)
+                                                                                                         AS Has_Tese_IncidenteDP_Peticionada,
+        MAX(CASE WHEN a.TIPO_ANDAMENTO = 'IMP 86.4 – TESE - INCIDENTE DESCONSIDERAÇÃO DA PERSONALIDADE JURÍDICA - INDEFERIDO' THEN 1 ELSE 0 END)
+                                                                                                         AS Has_Tese_IncidenteDP_Indeferida,
+        MAX(CASE WHEN a.TIPO_ANDAMENTO = 'IMP 091 - TESE APREENSÃO DE PASSAPORTE - PETICIONADO' THEN 1 ELSE 0 END)
+                                                                                                         AS Has_Tese_ApreensaoPassaporte_Peticionada,
+        MAX(CASE WHEN a.TIPO_ANDAMENTO = 'IMP 092.1 - TESE APREENSÃO DE PASSAPORTE - INDEFERIDO' THEN 1 ELSE 0 END)
+                                                                                                         AS Has_Tese_ApreensaoPassaporte_Indeferida,
+        MAX(CASE WHEN a.TIPO_ANDAMENTO = 'IMP 093- TESE BLOQUEIO DE CNH - PETICIONADO' THEN 1 ELSE 0 END)
+                                                                                                         AS Has_Tese_BloqCNH_Peticionada,
+        MAX(CASE WHEN a.TIPO_ANDAMENTO = 'IMP 094.1 - TESE BLOQUEIO DE CNH - INDEFERIDO' THEN 1 ELSE 0 END)
+                                                                                                         AS Has_Tese_BloqCNH_Indeferida,
+        MAX(CASE WHEN a.TIPO_ANDAMENTO = 'IMP 095- TESE BLOQUEIO PENHORA DE MARCA E PATENTE - PETICIONADO' THEN 1 ELSE 0 END)
+                                                                                                         AS Has_Tese_BloqPenhMarca_Peticionada,
+        MAX(CASE WHEN a.TIPO_ANDAMENTO = 'IMP 096.1 - TESE BLOQUEIO PENHORA DE MARCA E PATENTE - INDEFERIDO' THEN 1 ELSE 0 END)
+                                                                                                         AS Has_Tese_BloqPenhMarca_Indeferida,
+ 
+        MAX(CASE WHEN a.TIPO_ANDAMENTO = 'IMP 046.2 - PENHORA VALORES - NEGATIVA' THEN 1 ELSE 0 END)
+                                                                                                         AS Has_Penha_Valores_Negativa,
+        MAX(CASE WHEN a.TIPO_ANDAMENTO = 'IMP 101 - PESQUISA ARISP NEGATIVA' THEN 1 ELSE 0 END)
+                                                                                                         AS Has_Pesquisa_Arisp_Negativa,
+        MAX(CASE WHEN a.TIPO_ANDAMENTO = 'SISBAJUD NEGATIVO' THEN 1 ELSE 0 END)
+                                                                                                                AS Has_Sisbajud_Negativo,
+        MAX(CASE WHEN a.TIPO_ANDAMENTO = 'RENAJUD - NEGATIVO' THEN 1 ELSE 0 END)
+                                                                                                                AS Has_Renajud_Negativo,
+        MAX(CASE WHEN a.TIPO_ANDAMENTO = 'PESQUISA COMPLETA DE BENS - TESE DIFERENCIADA - NEGATIVA' THEN 1 ELSE 0 END)
+                                                                                                                AS Has_Pesquisa_Completa_Negativa
+
+    FROM JURIDICO.ANDAMENTOS a WITH(NOLOCK)
+    WHERE a.TIPO_ANDAMENTO IN (
+        'COM SINAL VITAL','SEM SINAL VITAL',
+        'IMP 070 - TESE PENHORA FATURAMENTO - PETICIONADO',
+        'IMP 071.1 - TESE PENHORA FATURAMENTO - INDEFERIDO',
+        'IMP 076 - TESE DESVIO DE RECEBÍVEIS - PETICIONADO',
+        'IMP 077.1 - TESE DESVIO DE RECEBÍVEIS - INDEFERIDO',
+        'IMP 079 - TESE GRUPO ECONÔMICO - PETICIONADO',
+        'IMP 080.1 - TESE GRUPO ECONÔMICO - INDEFERIDO',
+        'IMP 081 - TESE SUCESSÃO EMPRESARIAL - PETICIONADO',
+        'IMP 082.1 - TESE SUCESSÃO EMPRESARIAL - INDEFERIDO',
+        'IMP 083 - TESE FRAUDE À EXECUÇÃO - PETICIONADO',
+        'IMP 084.1 - TESE FRAUDE À EXECUÇÃO - INDEFERIDO',
+        'IMP 085 - TESE DESCONSIDERAÇÃO INVERSA DA PERSONALIDADE JURÍDICA - PETICIONADO',
+        'IMP 086.1 - TESE DESCONSIDERAÇÃO INVERSA DA PERSONALIDADE JURÍDICA - INDEFERIDO',
+        'IMP 86.2 – TESE - INCIDENTE DESCONSIDERAÇÃO DA PERSONALIDADE JURÍDICA - PETICIONADO',
+        'IMP 86.4 – TESE - INCIDENTE DESCONSIDERAÇÃO DA PERSONALIDADE JURÍDICA - INDEFERIDO',
+        'IMP 091 - TESE APREENSÃO DE PASSAPORTE - PETICIONADO',
+        'IMP 092.1 - TESE APREENSÃO DE PASSAPORTE - INDEFERIDO',
+        'IMP 093- TESE BLOQUEIO DE CNH - PETICIONADO',
+        'IMP 094.1 - TESE BLOQUEIO DE CNH - INDEFERIDO',
+        'IMP 095- TESE BLOQUEIO PENHORA DE MARCA E PATENTE - PETICIONADO',
+        'IMP 096.1 - TESE BLOQUEIO PENHORA DE MARCA E PATENTE - INDEFERIDO',
+        'IMP 046.2 - PENHORA VALORES - NEGATIVA',
+        'IMP 101 - PESQUISA ARISP NEGATIVA',
+        'SISBAJUD NEGATIVO',
+        'RENAJUD - NEGATIVO',
+        'PESQUISA COMPLETA DE BENS - TESE DIFERENCIADA - NEGATIVA'
+    )
+    GROUP BY a.PASTA
+),
+
+-- 4) Classificação final 
+CTE_CLASSIFICACAO AS (
+    SELECT
+        f.PASTA,
+        p.Valor_Imoveis,
+        p.Valor_MLE,
+        p.Valor_MLJ,
+        (ISNULL(p.Valor_Imoveis,0) + ISNULL(p.Valor_MLE,0) + ISNULL(p.Valor_MLJ,0)) AS Valor_Total_Penhora,
+        a.Has_Com_Sinal_Vital,
+        a.Has_Sem_Sinal_Vital,
+        a.Has_Tese_Penhora_Peticionada,
+        a.Has_Tese_Penhora_Indeferida,
+        a.Has_Tese_Desvio_Peticionada,
+        a.Has_Tese_Desvio_Indeferida,
+        a.Has_Tese_Grupo_Peticionada,
+        a.Has_Tese_Grupo_Indeferida,
+        a.Has_Tese_Sucessao_Peticionada,
+        a.Has_Tese_Sucessao_Indeferida,
+        a.Has_Tese_Fraude_Peticionada,
+        a.Has_Tese_Fraude_Indeferida,
+        a.Has_Tese_DescInversa_Peticionada,
+        a.Has_Tese_DescInversa_Indeferida,
+        a.Has_Tese_IncidenteDP_Peticionada,
+        a.Has_Tese_IncidenteDP_Indeferida,
+        a.Has_Tese_ApreensaoPassaporte_Peticionada,
+        a.Has_Tese_ApreensaoPassaporte_Indeferida,
+        a.Has_Tese_BloqCNH_Peticionada,
+        a.Has_Tese_BloqCNH_Indeferida,
+        a.Has_Tese_BloqPenhMarca_Peticionada,
+        a.Has_Tese_BloqPenhMarca_Indeferida,
+        a.Has_Pesquisa_Completa_Negativa,
+        a.Has_Renajud_Negativo,
+        a.Has_Sisbajud_Negativo,
+        a.Has_Pesquisa_Arisp_Negativa,
+        a.Has_Penha_Valores_Negativa,
+
+        CASE
+            WHEN (ISNULL(p.Valor_Imoveis,0) + ISNULL(p.Valor_MLE,0) + ISNULL(p.Valor_MLJ,0)) > f.VALOR_CAUSA
+                THEN 'SUPER RECUPERAVEL'
+            WHEN (ISNULL(p.Valor_MLJ,0) < f.VALOR_CAUSA * 0.5
+                  AND (ISNULL(p.Valor_MLE,0) + ISNULL(p.Valor_MLJ,0)) BETWEEN (f.VALOR_CAUSA * 0.1) AND (f.VALOR_CAUSA * 0.5))
+                THEN 'RECUPERAVEL'
+            WHEN (
+                    -- qualquer tese peticionada sem indeferido correspondente
+                    (a.Has_Tese_Penhora_Peticionada = 1 AND a.Has_Tese_Penhora_Indeferida = 0)
+                 OR (a.Has_Tese_Desvio_Peticionada = 1   AND a.Has_Tese_Desvio_Indeferida   = 0)
+                 OR (a.Has_Tese_Grupo_Peticionada = 1    AND a.Has_Tese_Grupo_Indeferida    = 0)
+                 OR (a.Has_Tese_Sucessao_Peticionada = 1 AND a.Has_Tese_Sucessao_Indeferida = 0)
+                 OR (a.Has_Tese_Fraude_Peticionada = 1   AND a.Has_Tese_Fraude_Indeferida   = 0)
+                 OR (a.Has_Tese_DescInversa_Peticionada = 1 AND a.Has_Tese_DescInversa_Indeferida = 0)
+                 OR (a.Has_Tese_IncidenteDP_Peticionada = 1 AND a.Has_Tese_IncidenteDP_Indeferida = 0)
+                 OR (a.Has_Tese_ApreensaoPassaporte_Peticionada = 1 AND a.Has_Tese_ApreensaoPassaporte_Indeferida = 0)
+                 OR (a.Has_Tese_BloqCNH_Peticionada = 1 AND a.Has_Tese_BloqCNH_Indeferida = 0)
+                 OR (a.Has_Tese_BloqPenhMarca_Peticionada = 1 AND a.Has_Tese_BloqPenhMarca_Indeferida = 0)
+                 -- ou sinal vital há mais de 2 anos
+                 OR (DATEDIFF(DAY, f.DATA_DO_AJUIZAMENTO, GETDATE()) > 730 AND a.Has_Com_Sinal_Vital = 1)
+                 -- ou penhora total acima de 10%
+                 OR ((ISNULL(p.Valor_Imoveis,0) + ISNULL(p.Valor_MLE,0) + ISNULL(p.Valor_MLJ,0)) > (f.VALOR_CAUSA * 0.1))
+                 )
+                THEN 'PARCIALMENTE RECUPERÁVEL'
+            WHEN
+                (
+                -- soma de todas as flags: NULL vira 0
+                COALESCE(a.Has_Tese_Penhora_Peticionada,0)
+                + COALESCE(a.Has_Tese_Desvio_Peticionada,0)
+                + COALESCE(a.Has_Tese_Grupo_Peticionada,0)
+                + COALESCE(a.Has_Tese_Sucessao_Peticionada,0)
+                + COALESCE(a.Has_Tese_Fraude_Peticionada,0)
+                + COALESCE(a.Has_Tese_DescInversa_Peticionada,0)
+                + COALESCE(a.Has_Tese_IncidenteDP_Peticionada,0)
+                + COALESCE(a.Has_Tese_ApreensaoPassaporte_Peticionada,0)
+                + COALESCE(a.Has_Tese_BloqCNH_Peticionada,0)
+                + COALESCE(a.Has_Tese_BloqPenhMarca_Peticionada,0)
+                ) = 0
+                OR(
+                                    -- qualquer tese peticionada sem indeferido correspondente
+                    (a.Has_Tese_Penhora_Peticionada = 1 AND a.Has_Tese_Penhora_Indeferida = 0)
+                 OR (a.Has_Tese_Desvio_Peticionada = 1   AND a.Has_Tese_Desvio_Indeferida   = 0)
+                 OR (a.Has_Tese_Grupo_Peticionada = 1    AND a.Has_Tese_Grupo_Indeferida    = 0)
+                 OR (a.Has_Tese_Sucessao_Peticionada = 1 AND a.Has_Tese_Sucessao_Indeferida = 0)
+                 OR (a.Has_Tese_Fraude_Peticionada = 1   AND a.Has_Tese_Fraude_Indeferida   = 0)
+                 OR (a.Has_Tese_DescInversa_Peticionada = 1 AND a.Has_Tese_DescInversa_Indeferida = 0)
+                 OR (a.Has_Tese_IncidenteDP_Peticionada = 1 AND a.Has_Tese_IncidenteDP_Indeferida = 0)
+                 OR (a.Has_Tese_ApreensaoPassaporte_Peticionada = 1 AND a.Has_Tese_ApreensaoPassaporte_Indeferida = 0)
+                 OR (a.Has_Tese_BloqCNH_Peticionada = 1 AND a.Has_Tese_BloqCNH_Indeferida = 0)
+                 OR (a.Has_Tese_BloqPenhMarca_Peticionada = 1 AND a.Has_Tese_BloqPenhMarca_Indeferida = 0)
+                )
+                OR (COALESCE(a.Has_Pesquisa_Arisp_Negativa,0) = 0 AND COALESCE(a.Has_Penha_Valores_Negativa,0) = 0)
+
+                OR (COALESCE(a.Has_Pesquisa_Completa_Negativa,0) = 0 AND COALESCE(a.Has_Renajud_Negativo,0) = 0 AND COALESCE(a.Has_Sisbajud_Negativo,0) = 0)
+
+                OR COALESCE(a.Has_Sem_Sinal_Vital,0) = 1
+
+                OR (
+                DATEDIFF(DAY, f.DATA_DO_AJUIZAMENTO, GETDATE()) < 730
+                AND COALESCE(a.Has_Com_Sinal_Vital,0) = 1
+                )
+            THEN
+                'IRECUPERAVEL'
+            ELSE NULL
+        END AS CLASSIFICACAO
+    FROM FichaProcessualFiltrada f
+    LEFT JOIN CTE_PENHORAS    p ON f.PASTA = p.PASTA
+    LEFT JOIN CTE_ANDAMENTOS  a ON f.PASTA = a.PASTA
+)
+
+SELECT 
+    FP.PASTA,
+    FP.CARTEIRA,
+    FP.PRODUTO,
+    FP.ESTADO,
+    FP.COMARCA,
+    FP.TIPO_ACAO,
+    FP.STATUS_PASTA,
+    FP.DATA_CADASTRO_PASTA,
+    FP.DATA_DO_AJUIZAMENTO,
+    FP.DATA_ENTRADA_PROC,
+    FP.ASSUNTO,
+    FP.DATA_TERCEIRIZACAO,
+    FP.CASO_NOVO,
+    FP.CASO_ANTIGO,
+    FP.PROCESSO,
+    FP.VALOR_CAUSA,
+    FP.BJ,
+    FP.DATA_ENCERRAMENTO,
+    FP.RESPONSAVEL_1,
+    FP.AGRUPADORES,
+    FP.FORCA_TAREFA,
+    FP.ESFERA,
+    FP.ORGAO_BANCO,
+    FP.FRENTE_RECUPERA_BB,
+    C.CLASSIFICACAO,
+    
+    -- Classificação do tipo de ação corrigida
+    CASE
+        WHEN fp.TIPO_ACAO IN ('BUSCA E APREENSÃO', 'POSSESSÓRIA', 'REINTEGRAÇÃO DE POSSE') 
+            THEN 'BUSCA E APREENSAO'
+        WHEN fp.TIPO_ACAO IN ('COBRANÇA', 'ORDINARIA DE COBRANCA', 'PROCEDIMENTO COMUM', 'PROCEDIMENTO ORDINÁRIO') 
+            THEN 'COBRANÇA'
+        WHEN fp.TIPO_ACAO = 'CONSOLIDAÇÃO DA PROPRIEDADE' 
+            THEN 'CONSOLIDAÇÃO DA PROPRIEDADE'
+        WHEN fp.TIPO_ACAO IN ('CUMPRIMENTO DE SENTENCA', 'EXECUÇÃO DE SENTENÇA') 
+            THEN 'CUMPRIMENTO DE SENTENCA'
+        WHEN fp.TIPO_ACAO IN ('EMBARGOS À EXECUÇÃO', 'EMBARGOS DE TERCEIRO', 'EXCEÇÃO DE PRÉ EXECUTIVIDADE') 
+            THEN 'EXECUÇÃO'
+        WHEN fp.TIPO_ACAO IN ('EXECUÇÃO', 'EXECUÇÃO DE TITULO EXTRAJUDICIAL') 
+            THEN 'EXECUÇÃO DE TITULO EXTRAJUDICIAL'
+        WHEN fp.TIPO_ACAO = 'HOMOLOGAÇÃO JUDICIAL' 
+            THEN 'HOMOLOGAÇÃO JUDICIAL'
+        WHEN fp.TIPO_ACAO = 'MONITÓRIA' 
+            THEN 'MONITÓRIA'
+        ELSE 'OUTROS' -- Todos os outros tipos de ação
+    END AS 'TIPO_AÇÃO_CORRIGIDA',
+
+    -- Dados do acordo mais recente
+    acorven.STATUS_ACORDO,
+    acorven.STATUS_GERAL,
+    acorven.dataPrimeiroVencimento,
+
+    -- Dados do último CPC (Contato Efetivo)
+    ultimo_cpc.ULTIMO_CPC,
+    ultimo_cpc.DATA_ULTIMO_CPC
+
+FROM 
+    FichaProcessualFiltrada AS FP WITH (NOLOCK)
+LEFT JOIN CTE_CLASSIFICACAO AS C WITH (NOLOCK) ON FP.PASTA = C.PASTA 
+LEFT JOIN AcordoRecente as acorven WITH (NOLOCK) ON FP.PASTA = Acorven.nkpasta AND acorven.rk = 1
+LEFT JOIN UltimoCPC as ultimo_cpc WITH(NOLOCK) ON FP.PASTA = ultimo_cpc.nkpasta AND ultimo_cpc.rk = 1;

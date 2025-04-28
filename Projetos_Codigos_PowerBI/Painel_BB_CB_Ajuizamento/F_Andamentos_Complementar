@@ -1,0 +1,21 @@
+select
+fp.pasta,
+anda.tipo_andamento,
+anda.data_andamento
+
+from juridico.fichaProcessual Fp
+left join juridico.andamentos anda on fp.pasta = anda.pasta
+WHERE ANDA.TIPO_ANDAMENTO IN (
+'TERCEIRIZAÇÃO', 
+'TERCEIRIZAÇÃO / MIGRAÇÃO',
+ 'MEDIDAS JUDICIAIS',
+ 'PASTA REABERTA',
+ 'AÇÃO NÃO AJUIZADA',
+ 'PROTOCOLO DIGITAL EFETUADO – INICIAL',
+ 'INICIAL PROTOCOLADA'
+)
+AND FP.BJ != 'VERIFICAR'
+AND FP.AREA != 'CONTENCIOSO CIVEL'
+AND FP.CARTEIRA != 'RECUPERAÇÃO JUDICIAL'
+AND FP.DEPARTAMENTO = 'COBRANÇA'
+AND FP.CASO_NOVO = 'SIM'

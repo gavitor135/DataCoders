@@ -1,0 +1,98 @@
+SELECT 
+    fp.PASTA,
+    fp.CNPJ_PARTE_ADVERSA,
+    fp.PRODUTO,
+    fp.TIPO_ACAO,
+    fp.ESTADO,
+    fp.CARTEIRA,
+    fp.PROCESSO,
+    fp.BJ,
+    fp.STATUS_PASTA,
+    fp.DATA_DO_AJUIZAMENTO,
+    fp.DATA_ENCERRAMENTO,
+    fp.DATA_ENTRADA_PROC,
+    fp.DATA_TERCEIRIZACAO,
+    fp.DATA_CADASTRO_PASTA,
+    fp.RESPONSAVEL_1,
+    fp.CASO_NOVO,
+    fp.CASO_ANTIGO,
+    fp.AGRUPADORES,
+    fp.ASSUNTO,
+    acorven.statusAcordo,
+    c1.TIPO_COMPROMISSO AS TIPO_COMPROMISSO_1,
+    c2.TIPO_COMPROMISSO AS TIPO_COMPROMISSO_2,
+    c3.TIPO_COMPROMISSO AS TIPO_COMPROMISSO_3,
+    c4.TIPO_COMPROMISSO AS TIPO_COMPROMISSO_4,
+    c4.DATA_CONCLUSAO_COMPROMISSO AS DATA_CONCLUSAO_COMPROMISSO_4,
+    c5.TIPO_COMPROMISSO AS TIPO_COMPROMISSO_5,
+    c5.DATA_CONCLUSAO_COMPROMISSO AS DATA_CONCLUSAO_COMPROMISSO_5,
+    tp.TIPO_DE_DOCUMENTO,
+    tp.DATA_EXECUCAO_TAREFA
+FROM Juridico.FichaProcessual fp
+LEFT JOIN (
+    SELECT 
+        PASTA,
+        TIPO_COMPROMISSO,
+        DATA_CONCLUSAO_COMPROMISSO,
+        RANK() OVER (PARTITION BY PASTA ORDER BY DATA_CONCLUSAO_COMPROMISSO DESC) AS RankCompromisso
+    FROM Juridico.Compromissos_Concluidos WITH (NOLOCK)
+    WHERE TIPO_COMPROMISSO = 'Encerramento'
+) c1 ON fp.PASTA = c1.PASTA AND c1.RankCompromisso = 1
+LEFT JOIN (
+    SELECT 
+        PASTA,
+        TIPO_COMPROMISSO,
+        DATA_CONCLUSAO_COMPROMISSO,
+        RANK() OVER (PARTITION BY PASTA ORDER BY DATA_CONCLUSAO_COMPROMISSO DESC) AS RankCompromisso
+    FROM Juridico.Compromissos_Concluidos WITH (NOLOCK)
+    WHERE TIPO_COMPROMISSO = 'PESQUISA COMPLETA DE BENS - TESE DIFERENCIADA'
+) c2 ON fp.PASTA = c2.PASTA AND c2.RankCompromisso = 1
+LEFT JOIN (
+    SELECT 
+        PASTA,
+        TIPO_COMPROMISSO,
+        DATA_CONCLUSAO_COMPROMISSO,
+        RANK() OVER (PARTITION BY PASTA ORDER BY DATA_CONCLUSAO_COMPROMISSO DESC) AS RankCompromisso
+    FROM Juridico.Compromissos_Concluidos WITH (NOLOCK)
+    WHERE TIPO_COMPROMISSO = 'RECOLHER CUSTAS INICIAIS DA AÇÃO'
+) c3 ON fp.PASTA = c3.PASTA AND c3.RankCompromisso = 1
+LEFT JOIN (
+    SELECT 
+        PASTA,
+        TIPO_COMPROMISSO,
+        DATA_CONCLUSAO_COMPROMISSO,
+        RANK() OVER (PARTITION BY PASTA ORDER BY DATA_CONCLUSAO_COMPROMISSO DESC) AS RankCompromisso
+    FROM Juridico.Compromissos_Concluidos WITH (NOLOCK)
+    WHERE TIPO_COMPROMISSO = 'RECURSO DE APELAÇÃO'
+) c4 ON fp.PASTA = c4.PASTA AND c4.RankCompromisso = 1
+LEFT JOIN (
+    SELECT 
+        PASTA,
+        TIPO_COMPROMISSO,
+        DATA_CONCLUSAO_COMPROMISSO,
+        RANK() OVER (PARTITION BY PASTA ORDER BY DATA_CONCLUSAO_COMPROMISSO DESC) AS RankCompromisso
+    FROM Juridico.Compromissos_Concluidos WITH (NOLOCK)
+    WHERE TIPO_COMPROMISSO = 'CONTRARRAZÕES DE APELAÇÃO'
+) c5 ON fp.PASTA = c5.PASTA AND c5.RankCompromisso = 1
+LEFT JOIN (
+    SELECT 
+        PASTA,
+        TIPO_DE_DOCUMENTO,
+        DATA_EXECUCAO_TAREFA,
+        RANK() OVER (PARTITION BY PASTA ORDER BY DATA_EXECUCAO_TAREFA DESC) AS RankTarefa
+    FROM Juridico.Triare_Protocolo WITH (NOLOCK)
+    WHERE TIPO_DE_DOCUMENTO = 'Petição de Suspensão pelo 921, III, CPC (H)'
+) tp ON fp.PASTA = tp.PASTA AND tp.RankTarefa = 1
+LEFT JOIN Juridico.Penhora_Imoveis pimo WITH (NOLOCK)
+    ON fp.PASTA = pimo.PASTA
+LEFT JOIN (    
+    SELECT
+        cli.cpfcnpjcliente,
+        contr.nkPasta,
+        acord.statusAcordo 
+    FROM negocial.COB_clienteEvento AS evc WITH (NOLOCK)
+    INNER JOIN negocial.COB_Acordo as acord WITH (NOLOCK) ON evc.nkClienteEvento = acord.nkAcordo 
+    INNER JOIN negocial.COB_Cliente AS cli WITH (NOLOCK) ON evc.nkCliente = cli.nkCliente
+    INNER JOIN negocial.COB_Contrato AS contr WITH (NOLOCK) ON cli.nkCliente = contr.nkCliente
+) acorven ON fp.PASTA = acorven.nkPasta 
+WHERE fp.PRODUTO = 'ITAÚ - COBRANÇA VAREJO';

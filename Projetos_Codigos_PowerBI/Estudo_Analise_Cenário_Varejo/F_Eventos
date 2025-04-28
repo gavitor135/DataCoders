@@ -1,0 +1,19 @@
+SELECT DISTINCT
+    fp.PASTA,
+    OPER.OPERADOR,
+    OPER.NKLOGIN,
+    EVC.NKEVENTO,
+    EVC.dataEventoCliente,
+    EVC.NKCLIENTEEVENTO,
+    EVE.EVENTO
+        
+    FROM JURIDICO.FICHAPROCESSUAL FP
+    LEFT JOIN NEGOCIAL.COB_CONTRATO CONT WITH(NOLOCK) ON FP.PASTA = CONT.NKPASTA
+    LEFT JOIN negocial.COB_Negociacao neg WITH (NOLOCK) ON CONT.nkContrato = neg.nkContrato
+    LEFT JOIN negocial.COB_eventoNegociacao evcNeg WITH (NOLOCK) ON neg.nkNegociacao = evcNeg.nkNegociacao
+    LEFT JOIN negocial.COB_clienteEvento evc WITH (NOLOCK) ON evcNeg.nkClienteEvento = evc.nkClienteEvento
+    LEFT JOIN negocial.COB_Operador oper WITH(NOLOCK) ON EVC.NKOPERADOR = OPER.NKOPERADOR
+    LEFT JOIN negocial.COB_Evento eve WITH (NOLOCK) ON evc.nkEvento = eve.nkEvento
+
+    WHERE FP.PRODUTO = 'ITAÚ - COBRANÇA VAREJO'
+    AND EVC.dataEventoCliente >= '01/01/2024'

@@ -1,0 +1,18 @@
+SELECT
+	fp.PASTA,
+	pmle.DATA_DO_REPASSE_AO_BANCO_PENHORA_MLE,
+	pmle.VALOR_NOMINAL_DO_DEPOSITO_PENHORA_MLE,
+	pmlj.DATA_DO_REPASSE_AO_BANCO_PENHORA_MLJ,
+	pmlj.VALOR_LEVANTADO_PENHORA_MLJ,
+	pmlj.DATA_DO_BLOQUEIO_PENHORA_MLJ
+
+FROM Juridico.FichaProcessual fp
+	left join juridico.Penhora_Mle pmle 	with(nolock)
+ON fp.pasta = pmle.pasta
+	left join juridico.Penhora_Mlj pmlj	    with(nolock)
+ON fp.PASTA = pmlj.PASTA
+WHERE fp.PRODUTO IN ('SAFRA - ATACADO PJ',
+                    'BANCO SOFISA - CORPORATE',
+                    'BTG PACTUAL - COBRANÇA',
+                    'FAST SHOP - CORPORATE',
+                    'VOTORANTIM - CORPORATE');
